@@ -3,6 +3,7 @@ from app.models.dataset import Dataset, DatasetVersion, DatasetReference
 from app.models.analysis import Analysis, AnalysisDataset, AnalysisRun
 from app.models.comment import Comment
 from app.models.publication import Publication, PublicationReference
+from app.models.star import Star
 
 __all__ = [
     "User",
@@ -15,4 +16,5 @@ __all__ = [
     "Comment",
     "Publication",
     "PublicationReference",
+    "Star",
 ]

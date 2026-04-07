@@ -16,11 +16,17 @@ class Analysis(Base, UUIDMixin, TimestampMixin):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    language: Mapped[str] = mapped_column(String(20), nullable=False)  # python, r, sql
+    language: Mapped[str] = mapped_column(String(20), nullable=False)
     source_code: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
+    star_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    fork_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    forked_from_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("analyses.id"), nullable=True
+    )
 
     owner = relationship("User", back_populates="analyses")
+    forked_from = relationship("Analysis", remote_side="Analysis.id", foreign_keys=[forked_from_id])
     datasets = relationship("AnalysisDataset", back_populates="analysis", cascade="all, delete-orphan")
     runs = relationship("AnalysisRun", back_populates="analysis", order_by="AnalysisRun.created_at.desc()")
 
@@ -59,6 +65,11 @@ class AnalysisRun(Base, UUIDMixin):
     result_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     result_meta: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Proof of work fields
+    pow_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    pow_nonce: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    pow_verified: Mapped[bool | None] = mapped_column(default=False, nullable=True)
+    environment_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -7,7 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
+from app.dependencies import get_current_user
 from app.models.publication import Publication, PublicationReference
+from app.models.user import User
 from app.schemas.publication import (
     PublicationCreate,
     PublicationListOut,
@@ -16,8 +18,6 @@ from app.schemas.publication import (
 )
 
 router = APIRouter(prefix="/api/publications", tags=["publications"])
-
-DEMO_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
 def slugify(text: str) -> str:
@@ -28,7 +28,11 @@ def slugify(text: str) -> str:
 
 
 @router.post("", response_model=PublicationOut, status_code=201)
-async def create_publication(body: PublicationCreate, db: AsyncSession = Depends(get_db)):
+async def create_publication(
+    body: PublicationCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     base_slug = slugify(body.title)
     slug = base_slug
     counter = 1
@@ -40,7 +44,7 @@ async def create_publication(body: PublicationCreate, db: AsyncSession = Depends
         counter += 1
 
     pub = Publication(
-        author_id=DEMO_USER_ID,
+        author_id=user.id,
         title=body.title,
         slug=slug,
         body=body.body,
@@ -63,18 +67,21 @@ async def create_publication(body: PublicationCreate, db: AsyncSession = Depends
 
 @router.get("", response_model=PublicationListOut)
 async def list_publications(
+    q: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    total = (await db.execute(select(func.count()).select_from(Publication))).scalar()
-    stmt = (
-        select(Publication)
-        .options(selectinload(Publication.references))
-        .order_by(Publication.updated_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    )
+    stmt = select(Publication).options(selectinload(Publication.references))
+    count_stmt = select(func.count()).select_from(Publication)
+
+    if q:
+        search_filter = Publication.title.ilike(f"%{q}%") | Publication.body.ilike(f"%{q}%")
+        stmt = stmt.where(search_filter)
+        count_stmt = count_stmt.where(search_filter)
+
+    total = (await db.execute(count_stmt)).scalar()
+    stmt = stmt.order_by(Publication.updated_at.desc()).offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(stmt)
     return PublicationListOut(items=result.scalars().all(), total=total, page=page, page_size=page_size)
 
@@ -91,13 +98,18 @@ async def get_publication(slug: str, db: AsyncSession = Depends(get_db)):
 
 @router.put("/{pub_id}", response_model=PublicationOut)
 async def update_publication(
-    pub_id: uuid.UUID, body: PublicationUpdate, db: AsyncSession = Depends(get_db),
+    pub_id: uuid.UUID,
+    body: PublicationUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Publication).where(Publication.id == pub_id).options(selectinload(Publication.references))
     result = await db.execute(stmt)
     pub = result.scalar_one_or_none()
     if not pub:
         raise HTTPException(status_code=404, detail="Publication not found")
+    if pub.author_id != user.id:
+        raise HTTPException(status_code=403, detail="Not your publication")
 
     if body.title is not None:
         pub.title = body.title
@@ -114,3 +126,18 @@ async def update_publication(
 
     await db.flush()
     return pub
+
+
+@router.delete("/{pub_id}", status_code=204)
+async def delete_publication(
+    pub_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    pub = await db.get(Publication, pub_id)
+    if not pub:
+        raise HTTPException(status_code=404, detail="Publication not found")
+    if pub.author_id != user.id:
+        raise HTTPException(status_code=403, detail="Not your publication")
+    await db.delete(pub)
+    await db.flush()

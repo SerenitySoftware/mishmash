@@ -6,18 +6,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
+from app.dependencies import get_current_user
 from app.models.comment import Comment
+from app.models.user import User
 from app.schemas.comment import CommentCreate, CommentOut, CommentUpdate
 
 router = APIRouter(prefix="/api/comments", tags=["comments"])
 
-DEMO_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
-
 
 @router.post("", response_model=CommentOut, status_code=201)
-async def create_comment(body: CommentCreate, db: AsyncSession = Depends(get_db)):
+async def create_comment(
+    body: CommentCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     comment = Comment(
-        author_id=DEMO_USER_ID,
+        author_id=user.id,
         target_type=body.target_type,
         target_id=body.target_id,
         parent_id=body.parent_id,
@@ -25,7 +29,10 @@ async def create_comment(body: CommentCreate, db: AsyncSession = Depends(get_db)
     )
     db.add(comment)
     await db.flush()
-    return comment
+
+    stmt = select(Comment).where(Comment.id == comment.id).options(selectinload(Comment.author))
+    result = await db.execute(stmt)
+    return result.scalar_one()
 
 
 @router.get("", response_model=list[CommentOut])
@@ -37,7 +44,7 @@ async def list_comments(
     stmt = (
         select(Comment)
         .where(Comment.target_type == target_type, Comment.target_id == target_id, Comment.parent_id.is_(None))
-        .options(selectinload(Comment.replies))
+        .options(selectinload(Comment.replies).selectinload(Comment.author), selectinload(Comment.author))
         .order_by(Comment.created_at.asc())
     )
     result = await db.execute(stmt)
@@ -46,20 +53,31 @@ async def list_comments(
 
 @router.put("/{comment_id}", response_model=CommentOut)
 async def update_comment(
-    comment_id: uuid.UUID, body: CommentUpdate, db: AsyncSession = Depends(get_db),
+    comment_id: uuid.UUID,
+    body: CommentUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     comment = await db.get(Comment, comment_id)
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
+    if comment.author_id != user.id:
+        raise HTTPException(status_code=403, detail="Not your comment")
     comment.body = body.body
     await db.flush()
     return comment
 
 
 @router.delete("/{comment_id}", status_code=204)
-async def delete_comment(comment_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def delete_comment(
+    comment_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     comment = await db.get(Comment, comment_id)
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
+    if comment.author_id != user.id:
+        raise HTTPException(status_code=403, detail="Not your comment")
     await db.delete(comment)
     await db.flush()

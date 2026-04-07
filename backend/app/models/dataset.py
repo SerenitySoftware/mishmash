@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import BigInteger, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,8 +21,17 @@ class Dataset(Base, UUIDMixin, TimestampMixin):
     current_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     row_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     column_meta: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    license: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    star_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    fork_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    forked_from_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("datasets.id"), nullable=True
+    )
+    download_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     owner = relationship("User", back_populates="datasets")
+    forked_from = relationship("Dataset", remote_side="Dataset.id", foreign_keys=[forked_from_id])
     versions = relationship(
         "DatasetVersion", back_populates="dataset", order_by="DatasetVersion.version"
     )
@@ -38,7 +47,7 @@ class Dataset(Base, UUIDMixin, TimestampMixin):
     )
 
 
-class DatasetVersion(Base, UUIDMixin):
+class DatasetVersion(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "dataset_versions"
 
     dataset_id: Mapped[uuid.UUID] = mapped_column(
@@ -53,9 +62,6 @@ class DatasetVersion(Base, UUIDMixin):
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
-    created_at: Mapped = mapped_column(
-        server_default="now()", nullable=False
-    )
 
     dataset = relationship("Dataset", back_populates="versions")
 
@@ -64,7 +70,7 @@ class DatasetVersion(Base, UUIDMixin):
     )
 
 
-class DatasetReference(Base, UUIDMixin):
+class DatasetReference(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "dataset_references"
 
     source_id: Mapped[uuid.UUID] = mapped_column(
@@ -77,7 +83,6 @@ class DatasetReference(Base, UUIDMixin):
         String(50), default="derived_from", nullable=False
     )
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped = mapped_column(server_default="now()", nullable=False)
 
     source = relationship("Dataset", foreign_keys=[source_id], back_populates="outgoing_refs")
     target = relationship("Dataset", foreign_keys=[target_id], back_populates="incoming_refs")

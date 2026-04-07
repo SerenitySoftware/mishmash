@@ -37,6 +37,10 @@ class AnalysisRunOut(BaseModel):
     result_key: str | None
     result_meta: dict | None
     error_message: str | None
+    pow_hash: str | None
+    pow_nonce: str | None
+    pow_verified: bool | None
+    environment_hash: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -50,14 +54,27 @@ class AnalysisDatasetOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class OwnerOut(BaseModel):
+    id: uuid.UUID
+    username: str
+    name: str
+    avatar_url: str | None
+
+    model_config = {"from_attributes": True}
+
+
 class AnalysisOut(BaseModel):
     id: uuid.UUID
     owner_id: uuid.UUID
+    owner: OwnerOut | None = None
     title: str
     description: str | None
     language: str
     source_code: str
     status: str
+    star_count: int
+    fork_count: int
+    forked_from_id: uuid.UUID | None
     datasets: list[AnalysisDatasetOut]
     created_at: datetime
     updated_at: datetime
@@ -70,3 +87,27 @@ class AnalysisListOut(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class AnalysisForkRequest(BaseModel):
+    title: str | None = None
+    description: str | None = None
+
+
+class ChallengeOut(BaseModel):
+    analysis_id: str
+    source_hash: str
+    dataset_hashes: list[str]
+    nonce_seed: str
+    difficulty: int
+
+
+class ProofSubmission(BaseModel):
+    proof_hash: str
+    nonce: str
+    output_hash: str
+    environment_info: dict
+    stdout: str | None = None
+    stderr: str | None = None
+    duration_ms: int | None = None
+    result_files: list[str] = []

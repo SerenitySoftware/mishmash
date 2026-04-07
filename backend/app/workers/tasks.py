@@ -10,7 +10,8 @@ from app.services.runner import run_analysis_in_container
 from app.workers.celery_app import celery_app
 
 # Sync engine for celery workers (celery is sync)
-sync_url = settings.database_url.replace("+asyncpg", "+psycopg2").replace("postgresql+psycopg2", "postgresql")
+# Convert async URL to sync: postgresql+asyncpg://... -> postgresql+psycopg2://...
+sync_url = settings.database_url.replace("+asyncpg", "+psycopg2")
 sync_engine = create_engine(sync_url)
 SyncSession = sessionmaker(sync_engine)
 

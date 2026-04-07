@@ -20,6 +20,6 @@ class Comment(Base, UUIDMixin, TimestampMixin):
     )
     body: Mapped[str] = mapped_column(Text, nullable=False)
 
-    author = relationship("User", back_populates="comments")
+    author = relationship("User", back_populates="comments", lazy="selectin")
     replies = relationship("Comment", back_populates="parent", lazy="selectin")
     parent = relationship("Comment", back_populates="replies", remote_side="Comment.id")

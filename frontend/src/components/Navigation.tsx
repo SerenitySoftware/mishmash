@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
+import { useAuth } from "@/lib/auth";
 
 const links = [
   { href: "/datasets", label: "Datasets" },
@@ -12,6 +13,7 @@ const links = [
 
 export function Navigation() {
   const pathname = usePathname();
+  const { user, logout, loading } = useAuth();
 
   return (
     <nav className="border-b border-gray-200 bg-white">
@@ -37,6 +39,41 @@ export function Navigation() {
                 </Link>
               ))}
             </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {!loading && (
+              user ? (
+                <>
+                  <Link
+                    href={`/u/${user.username}`}
+                    className="text-sm font-medium text-gray-700 hover:text-gray-900"
+                  >
+                    {user.name}
+                  </Link>
+                  <button
+                    onClick={logout}
+                    className="rounded-md px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100 transition"
+                  >
+                    Log out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 transition"
+                  >
+                    Log in
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="rounded-lg bg-brand-600 px-4 py-1.5 text-sm text-white font-medium hover:bg-brand-700 transition"
+                  >
+                    Sign up
+                  </Link>
+                </>
+              )
+            )}
           </div>
         </div>
       </div>

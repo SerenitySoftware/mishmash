@@ -9,7 +9,15 @@ export function DatasetCard({ dataset }: { dataset: Dataset }) {
     >
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="font-semibold text-gray-900">{dataset.name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-gray-900">{dataset.name}</h3>
+            {dataset.forked_from_id && (
+              <span className="text-xs text-gray-400">forked</span>
+            )}
+          </div>
+          {dataset.owner && (
+            <p className="text-xs text-gray-500">by @{dataset.owner.username}</p>
+          )}
           {dataset.description && (
             <p className="mt-1 text-sm text-gray-600 line-clamp-2">
               {dataset.description}
@@ -25,6 +33,9 @@ export function DatasetCard({ dataset }: { dataset: Dataset }) {
           <span>{dataset.row_count.toLocaleString()} rows</span>
         )}
         <span>v{dataset.current_version}</span>
+        <span>{dataset.star_count} stars</span>
+        <span>{dataset.fork_count} forks</span>
+        <span>{dataset.download_count} downloads</span>
         {dataset.tags.length > 0 && (
           <div className="flex gap-1">
             {dataset.tags.slice(0, 3).map((tag) => (

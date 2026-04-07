@@ -9,12 +9,14 @@ class DatasetCreate(BaseModel):
     description: str | None = None
     tags: list[str] = []
     format: str = Field(pattern="^(csv|json|parquet)$")
+    license: str | None = None
 
 
 class DatasetUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
     description: str | None = None
     tags: list[str] | None = None
+    license: str | None = None
 
 
 class DatasetVersionOut(BaseModel):
@@ -29,9 +31,19 @@ class DatasetVersionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class OwnerOut(BaseModel):
+    id: uuid.UUID
+    username: str
+    name: str
+    avatar_url: str | None
+
+    model_config = {"from_attributes": True}
+
+
 class DatasetOut(BaseModel):
     id: uuid.UUID
     owner_id: uuid.UUID
+    owner: OwnerOut | None = None
     name: str
     slug: str
     description: str | None
@@ -40,6 +52,12 @@ class DatasetOut(BaseModel):
     current_version: int
     row_count: int | None
     column_meta: dict | None
+    license: str | None
+    is_public: bool
+    star_count: int
+    fork_count: int
+    download_count: int
+    forked_from_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 
@@ -80,3 +98,8 @@ class UploadCompleteRequest(BaseModel):
     dataset_id: uuid.UUID
     storage_key: str
     file_size_bytes: int | None = None
+
+
+class DatasetForkRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None

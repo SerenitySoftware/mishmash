@@ -1,4 +1,5 @@
 import io
+import re
 import uuid
 from typing import Any
 
@@ -8,18 +9,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.dataset import Dataset, DatasetReference, DatasetVersion
+from app.models.user import User
 from app.services.storage import (
     create_presigned_download_url,
     create_presigned_upload_url,
     download_file,
     generate_upload_key,
-    get_s3_client,
 )
 from app.config import settings
 
 
 def slugify(name: str) -> str:
-    import re
     slug = name.lower().strip()
     slug = re.sub(r"[^\w\s-]", "", slug)
     slug = re.sub(r"[\s_]+", "-", slug)
@@ -29,12 +29,12 @@ def slugify(name: str) -> str:
 
 async def create_dataset(
     db: AsyncSession, owner_id: uuid.UUID, name: str, description: str | None,
-    tags: list[str], format: str,
+    tags: list[str], format: str, license: str | None = None,
+    forked_from_id: uuid.UUID | None = None,
 ) -> Dataset:
     base_slug = slugify(name)
     slug = base_slug
 
-    # Ensure unique slug
     counter = 1
     while True:
         existing = await db.execute(select(Dataset).where(Dataset.slug == slug))
@@ -50,6 +50,8 @@ async def create_dataset(
         description=description,
         tags=tags,
         format=format,
+        license=license,
+        forked_from_id=forked_from_id,
     )
     db.add(dataset)
     await db.flush()
@@ -58,9 +60,10 @@ async def create_dataset(
 
 async def list_datasets(
     db: AsyncSession, query: str | None = None, tags: list[str] | None = None,
+    owner_username: str | None = None, sort: str = "updated",
     page: int = 1, page_size: int = 20,
 ) -> tuple[list[Dataset], int]:
-    stmt = select(Dataset)
+    stmt = select(Dataset).options(selectinload(Dataset.owner))
     count_stmt = select(func.count()).select_from(Dataset)
 
     if query:
@@ -72,20 +75,40 @@ async def list_datasets(
         stmt = stmt.where(Dataset.tags.overlap(tags))
         count_stmt = count_stmt.where(Dataset.tags.overlap(tags))
 
+    if owner_username:
+        stmt = stmt.join(User).where(User.username == owner_username)
+        count_stmt = count_stmt.join(User).where(User.username == owner_username)
+
     total = (await db.execute(count_stmt)).scalar()
-    stmt = stmt.order_by(Dataset.updated_at.desc()).offset((page - 1) * page_size).limit(page_size)
+
+    order_map = {
+        "updated": Dataset.updated_at.desc(),
+        "stars": Dataset.star_count.desc(),
+        "downloads": Dataset.download_count.desc(),
+        "created": Dataset.created_at.desc(),
+    }
+    stmt = stmt.order_by(order_map.get(sort, Dataset.updated_at.desc()))
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(stmt)
     return result.scalars().all(), total
 
 
 async def get_dataset_by_slug(db: AsyncSession, slug: str) -> Dataset | None:
-    stmt = select(Dataset).where(Dataset.slug == slug).options(selectinload(Dataset.versions))
+    stmt = (
+        select(Dataset)
+        .where(Dataset.slug == slug)
+        .options(selectinload(Dataset.versions), selectinload(Dataset.owner))
+    )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 
 
 async def get_dataset_by_id(db: AsyncSession, dataset_id: uuid.UUID) -> Dataset | None:
-    stmt = select(Dataset).where(Dataset.id == dataset_id).options(selectinload(Dataset.versions))
+    stmt = (
+        select(Dataset)
+        .where(Dataset.id == dataset_id)
+        .options(selectinload(Dataset.versions), selectinload(Dataset.owner))
+    )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 
@@ -133,7 +156,6 @@ async def get_dataset_preview(
         raise ValueError("Dataset not found or has no versions")
 
     latest = dataset.versions[-1]
-    # Download from S3 and read first N rows
     import tempfile
     import os
 
@@ -155,8 +177,8 @@ async def get_dataset_preview(
         return {
             "columns": list(df.columns),
             "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()},
-            "rows": df.to_dict(orient="records"),
-            "total_rows": latest.row_count,
+            "rows": df.where(df.notna(), None).to_dict(orient="records"),
+            "total_rows": latest.row_count or len(df),
         }
     finally:
         os.unlink(tmp_path)
