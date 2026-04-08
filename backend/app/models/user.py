@@ -19,8 +19,10 @@ class User(Base, UUIDMixin, TimestampMixin):
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    datasets = relationship("Dataset", back_populates="owner", lazy="selectin")
-    analyses = relationship("Analysis", back_populates="owner", lazy="selectin")
-    comments = relationship("Comment", back_populates="author", lazy="selectin")
-    publications = relationship("Publication", back_populates="author", lazy="selectin")
-    stars = relationship("Star", back_populates="user", lazy="selectin")
+    # Use lazy="noload" to prevent loading collections on every user fetch.
+    # Explicitly use selectinload() in queries that need these relationships.
+    datasets = relationship("Dataset", back_populates="owner", lazy="noload")
+    analyses = relationship("Analysis", back_populates="owner", lazy="noload")
+    comments = relationship("Comment", back_populates="author", lazy="noload")
+    publications = relationship("Publication", back_populates="author", lazy="noload")
+    stars = relationship("Star", back_populates="user", lazy="noload")
