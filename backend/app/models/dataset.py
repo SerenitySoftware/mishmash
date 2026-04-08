@@ -59,6 +59,9 @@ class DatasetVersion(Base, UUIDMixin, TimestampMixin):
     checksum_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     row_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     column_meta: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    quality_profile: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    change_summary: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # diff vs previous version
+    changelog: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )

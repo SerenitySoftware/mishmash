@@ -41,6 +41,7 @@ async def create_analysis(
         description=body.description,
         language=body.language,
         source_code=body.source_code,
+        requirements=body.requirements,
     )
     db.add(analysis)
     await db.flush()
@@ -125,6 +126,8 @@ async def update_analysis(
         analysis.description = body.description
     if body.source_code is not None:
         analysis.source_code = body.source_code
+    if body.requirements is not None:
+        analysis.requirements = body.requirements
 
     if body.datasets is not None:
         for link in analysis.datasets:
@@ -230,7 +233,7 @@ async def trigger_run(
     from app.workers.tasks import run_analysis_task
     run_analysis_task.delay(
         str(analysis.id), str(run.id), analysis.language,
-        analysis.source_code, dataset_files,
+        analysis.source_code, dataset_files, analysis.requirements,
     )
 
     analysis.status = "queued"

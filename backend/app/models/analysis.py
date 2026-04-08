@@ -18,6 +18,7 @@ class Analysis(Base, UUIDMixin, TimestampMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     language: Mapped[str] = mapped_column(String(20), nullable=False)
     source_code: Mapped[str] = mapped_column(Text, nullable=False)
+    requirements: Mapped[str | None] = mapped_column(Text, nullable=True)  # pip requirements.txt or R packages
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
     star_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     fork_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

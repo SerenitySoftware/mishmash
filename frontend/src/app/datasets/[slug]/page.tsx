@@ -22,7 +22,9 @@ export default function DatasetDetailPage() {
   const [references, setReferences] = useState<DatasetReference[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"preview" | "schema" | "versions" | "references" | "comments">("preview");
+  const [activeTab, setActiveTab] = useState<"preview" | "schema" | "quality" | "versions" | "references" | "comments">("preview");
+  const [citation, setCitation] = useState<string | null>(null);
+  const [showCitation, setShowCitation] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -67,6 +69,13 @@ export default function DatasetDetailPage() {
     if (!dataset) return;
     const resp = await apiFetch<{ download_url: string }>(`/api/datasets/${dataset.id}/download`);
     window.open(resp.download_url, "_blank");
+  };
+
+  const handleCite = async () => {
+    if (!dataset) return;
+    const resp = await apiFetch<{ citation: string }>(`/api/datasets/${dataset.id}/cite?format=bibtex`);
+    setCitation(resp.citation);
+    setShowCitation(true);
   };
 
   const handleUploadVersion = async (file: File) => {
@@ -123,6 +132,9 @@ export default function DatasetDetailPage() {
               Fork ({dataset.fork_count})
             </button>
           )}
+          <button onClick={handleCite} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 transition">
+            Cite
+          </button>
           <button onClick={handleDownload} className="rounded-lg bg-brand-600 px-4 py-1.5 text-sm text-white font-medium hover:bg-brand-700 transition">
             Download
           </button>
@@ -132,7 +144,7 @@ export default function DatasetDetailPage() {
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <div className="flex gap-4">
-          {(["preview", "schema", "versions", "references", "comments"] as const).map((tab) => (
+          {(["preview", "schema", "quality", "versions", "references", "comments"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -235,8 +247,127 @@ export default function DatasetDetailPage() {
         </div>
       )}
 
+      {activeTab === "quality" && versions.length > 0 && (
+        <QualityTab datasetId={dataset.id} latestVersion={versions[versions.length - 1]} />
+      )}
+      {activeTab === "quality" && versions.length === 0 && (
+        <p className="text-center py-8 text-gray-500">Upload a version to see quality analysis.</p>
+      )}
+
       {activeTab === "comments" && (
         <CommentThread targetType="dataset" targetId={dataset.id} comments={comments} onRefresh={fetchData} />
+      )}
+
+      {/* Citation modal */}
+      {showCitation && citation && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCitation(false)}>
+          <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-semibold text-lg">Cite this Dataset</h3>
+            <pre className="bg-gray-50 rounded-lg p-4 text-sm overflow-x-auto whitespace-pre-wrap">{citation}</pre>
+            <div className="flex gap-2">
+              <button onClick={() => { navigator.clipboard.writeText(citation); }}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white font-medium hover:bg-brand-700 transition">
+                Copy to Clipboard
+              </button>
+              <button onClick={() => setShowCitation(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50 transition">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QualityTab({ datasetId, latestVersion }: { datasetId: string; latestVersion: DatasetVersion }) {
+  const [report, setReport] = useState<Record<string, unknown> | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiFetch<Record<string, unknown>>(`/api/datasets/${datasetId}/validate`)
+      .then(setReport)
+      .catch(() => setReport(null))
+      .finally(() => setLoading(false));
+  }, [datasetId]);
+
+  if (loading) return <div className="text-center py-8 text-gray-500">Running quality checks...</div>;
+  if (!report) return <div className="text-center py-8 text-gray-500">Quality analysis unavailable.</div>;
+
+  const qualityScore = report.quality_score as number;
+  const issues = report.issues as string[];
+  const warnings = report.warnings as string[];
+  const columns = report.columns as any[];
+
+  return (
+    <div className="space-y-6">
+      {/* Quality score */}
+      <div className="flex items-center gap-4">
+        <div className={`text-4xl font-bold ${qualityScore >= 80 ? "text-green-600" : qualityScore >= 50 ? "text-yellow-600" : "text-red-600"}`}>
+          {qualityScore}
+        </div>
+        <div>
+          <p className="font-semibold">Quality Score</p>
+          <p className="text-sm text-gray-500">
+            {qualityScore >= 80 ? "Good quality" : qualityScore >= 50 ? "Some issues found" : "Significant issues"}
+          </p>
+        </div>
+      </div>
+
+      {/* Issues */}
+      {issues.length > 0 && (
+        <div className="rounded-lg bg-red-50 border border-red-200 p-4">
+          <h4 className="font-semibold text-red-800 mb-2">Issues ({issues.length})</h4>
+          <ul className="space-y-1">
+            {issues.map((issue, i) => <li key={i} className="text-sm text-red-700">{issue}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {/* Warnings */}
+      {warnings.length > 0 && (
+        <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
+          <h4 className="font-semibold text-yellow-800 mb-2">Warnings ({warnings.length})</h4>
+          <ul className="space-y-1">
+            {warnings.map((w, i) => <li key={i} className="text-sm text-yellow-700">{w}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {/* Column quality */}
+      {columns && columns.length > 0 && (
+        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Column</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nulls</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unique</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stats</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {columns.map((col: any) => (
+                <tr key={col.name}>
+                  <td className="px-4 py-2 text-sm font-medium">{col.name}</td>
+                  <td className="px-4 py-2 text-sm text-gray-600">{col.dtype}</td>
+                  <td className="px-4 py-2 text-sm">
+                    <span className={col.null_pct > 50 ? "text-red-600" : col.null_pct > 10 ? "text-yellow-600" : "text-gray-600"}>
+                      {col.null_pct}%
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-600">{col.unique_count} ({col.unique_pct}%)</td>
+                  <td className="px-4 py-2 text-sm text-gray-600">
+                    {col.mean !== undefined ? `avg: ${col.mean?.toFixed(2)}, std: ${col.std?.toFixed(2)}` : "-"}
+                    {col.outlier_count ? ` (${col.outlier_count} outliers)` : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

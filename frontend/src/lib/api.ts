@@ -133,8 +133,12 @@ export interface DatasetVersion {
   id: string;
   version: number;
   file_size_bytes: number | null;
+  checksum_sha256: string | null;
   row_count: number | null;
   column_meta: ColumnMeta[] | null;
+  quality_profile: Record<string, unknown> | null;
+  change_summary: Record<string, unknown> | null;
+  changelog: string | null;
   created_at: string;
 }
 
@@ -163,6 +167,7 @@ export interface Analysis {
   description: string | null;
   language: string;
   source_code: string;
+  requirements: string | null;
   status: string;
   star_count: number;
   fork_count: number;

@@ -26,6 +26,9 @@ class DatasetVersionOut(BaseModel):
     checksum_sha256: str | None
     row_count: int | None
     column_meta: dict | None
+    quality_profile: dict | None = None
+    change_summary: dict | None = None
+    changelog: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -98,6 +101,7 @@ class UploadCompleteRequest(BaseModel):
     dataset_id: uuid.UUID
     storage_key: str
     file_size_bytes: int | None = None
+    changelog: str | None = None
 
 
 class DatasetForkRequest(BaseModel):

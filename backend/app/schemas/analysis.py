@@ -15,6 +15,7 @@ class AnalysisCreate(BaseModel):
     description: str | None = None
     language: str = Field(pattern="^(python|r|sql)$")
     source_code: str = Field(min_length=1)
+    requirements: str | None = None  # pip requirements.txt or R packages
     datasets: list[AnalysisDatasetIn] = []
 
 
@@ -22,6 +23,7 @@ class AnalysisUpdate(BaseModel):
     title: str | None = Field(None, min_length=1, max_length=255)
     description: str | None = None
     source_code: str | None = None
+    requirements: str | None = None
     datasets: list[AnalysisDatasetIn] | None = None
 
 
@@ -71,6 +73,7 @@ class AnalysisOut(BaseModel):
     description: str | None
     language: str
     source_code: str
+    requirements: str | None
     status: str
     star_count: int
     fork_count: int

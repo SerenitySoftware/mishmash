@@ -25,6 +25,7 @@ def run_analysis_in_container(
     language: str,
     source_code: str,
     dataset_files: list[dict],  # [{storage_key, bucket, alias, format}]
+    requirements: str | None = None,
 ) -> dict:
     """Execute an analysis script in a sandboxed Docker container.
 
@@ -48,6 +49,13 @@ def run_analysis_in_container(
         script_path = os.path.join(work_dir, f"script{ext}")
         with open(script_path, "w") as f:
             f.write(source_code)
+
+        # Write requirements if provided
+        req_path = None
+        if requirements and requirements.strip():
+            req_path = os.path.join(work_dir, "requirements.txt")
+            with open(req_path, "w") as f:
+                f.write(requirements)
 
         # Build docker run command
         image = RUNNER_IMAGES.get(language)
@@ -75,9 +83,25 @@ def run_analysis_in_container(
             "-v", f"{data_dir}:/data:ro",
             "-v", f"{output_dir}:/output",
             "-v", f"{script_path}:/script{ext}:ro",
-            image,
-            *cmd_in_container,
         ]
+
+        # Mount requirements if provided
+        if req_path:
+            docker_cmd.extend(["-v", f"{req_path}:/requirements.txt:ro"])
+            # Install requirements before running (needs network temporarily)
+            docker_cmd.remove("--network=none")  # Allow pip install
+            if language == "python":
+                cmd_in_container = [
+                    "sh", "-c",
+                    f"pip install --no-cache-dir -r /requirements.txt 2>/dev/null; python /script{ext}",
+                ]
+            elif language == "r":
+                cmd_in_container = [
+                    "sh", "-c",
+                    f"Rscript -e 'install.packages(readLines(\"/requirements.txt\"), repos=\"https://cloud.r-project.org\")'; Rscript /script{ext}",
+                ]
+
+        docker_cmd.extend([image, *cmd_in_container])
 
         start = time.monotonic()
         result = subprocess.run(
