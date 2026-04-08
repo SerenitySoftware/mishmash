@@ -55,7 +55,9 @@ async def create_analysis(
         db.add(link)
 
     await db.flush()
-    stmt = select(Analysis).where(Analysis.id == analysis.id).options(selectinload(Analysis.datasets))
+    stmt = select(Analysis).where(Analysis.id == analysis.id).options(
+        selectinload(Analysis.datasets), selectinload(Analysis.owner)
+    )
     result = await db.execute(stmt)
     return result.scalar_one()
 
@@ -69,7 +71,7 @@ async def list_analyses(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Analysis).options(selectinload(Analysis.datasets))
+    stmt = select(Analysis).options(selectinload(Analysis.datasets), selectinload(Analysis.owner))
     count_stmt = select(func.count()).select_from(Analysis)
 
     if q:
@@ -94,7 +96,7 @@ async def list_analyses(
 
 @router.get("/{analysis_id}", response_model=AnalysisOut)
 async def get_analysis(analysis_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    stmt = select(Analysis).where(Analysis.id == analysis_id).options(selectinload(Analysis.datasets))
+    stmt = select(Analysis).where(Analysis.id == analysis_id).options(selectinload(Analysis.datasets), selectinload(Analysis.owner))
     result = await db.execute(stmt)
     analysis = result.scalar_one_or_none()
     if not analysis:
@@ -109,7 +111,7 @@ async def update_analysis(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Analysis).where(Analysis.id == analysis_id).options(selectinload(Analysis.datasets))
+    stmt = select(Analysis).where(Analysis.id == analysis_id).options(selectinload(Analysis.datasets), selectinload(Analysis.owner))
     result = await db.execute(stmt)
     analysis = result.scalar_one_or_none()
     if not analysis:
@@ -159,7 +161,7 @@ async def fork_analysis(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Analysis).where(Analysis.id == analysis_id).options(selectinload(Analysis.datasets))
+    stmt = select(Analysis).where(Analysis.id == analysis_id).options(selectinload(Analysis.datasets), selectinload(Analysis.owner))
     result = await db.execute(stmt)
     original = result.scalar_one_or_none()
     if not original:
@@ -187,7 +189,7 @@ async def fork_analysis(
     original.fork_count += 1
     await db.flush()
 
-    stmt = select(Analysis).where(Analysis.id == forked.id).options(selectinload(Analysis.datasets))
+    stmt = select(Analysis).where(Analysis.id == forked.id).options(selectinload(Analysis.datasets), selectinload(Analysis.owner))
     return (await db.execute(stmt)).scalar_one()
 
 
@@ -197,7 +199,7 @@ async def trigger_run(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Analysis).where(Analysis.id == analysis_id).options(selectinload(Analysis.datasets))
+    stmt = select(Analysis).where(Analysis.id == analysis_id).options(selectinload(Analysis.datasets), selectinload(Analysis.owner))
     result = await db.execute(stmt)
     analysis = result.scalar_one_or_none()
     if not analysis:
@@ -243,7 +245,7 @@ async def get_challenge(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Analysis).where(Analysis.id == analysis_id).options(selectinload(Analysis.datasets))
+    stmt = select(Analysis).where(Analysis.id == analysis_id).options(selectinload(Analysis.datasets), selectinload(Analysis.owner))
     result = await db.execute(stmt)
     analysis = result.scalar_one_or_none()
     if not analysis:
@@ -271,7 +273,7 @@ async def submit_proof(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Analysis).where(Analysis.id == analysis_id).options(selectinload(Analysis.datasets))
+    stmt = select(Analysis).where(Analysis.id == analysis_id).options(selectinload(Analysis.datasets), selectinload(Analysis.owner))
     result = await db.execute(stmt)
     analysis = result.scalar_one_or_none()
     if not analysis:

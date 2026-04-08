@@ -47,11 +47,13 @@ async def list_datasets(
     sort: str = Query("updated", pattern="^(updated|stars|downloads|created)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
     items, total = await dataset_service.list_datasets(
         db, query=q, tags=tags, owner_username=owner, sort=sort,
         page=page, page_size=page_size,
+        requesting_user_id=user.id if user else None,
     )
     return DatasetListOut(items=items, total=total, page=page, page_size=page_size)
 

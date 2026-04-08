@@ -60,7 +60,9 @@ async def create_publication(
         ))
     await db.flush()
 
-    stmt = select(Publication).where(Publication.id == pub.id).options(selectinload(Publication.references))
+    stmt = select(Publication).where(Publication.id == pub.id).options(
+        selectinload(Publication.references), selectinload(Publication.author)
+    )
     result = await db.execute(stmt)
     return result.scalar_one()
 
@@ -72,7 +74,7 @@ async def list_publications(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Publication).options(selectinload(Publication.references))
+    stmt = select(Publication).options(selectinload(Publication.references), selectinload(Publication.author))
     count_stmt = select(func.count()).select_from(Publication)
 
     if q:
@@ -88,7 +90,9 @@ async def list_publications(
 
 @router.get("/{slug}", response_model=PublicationOut)
 async def get_publication(slug: str, db: AsyncSession = Depends(get_db)):
-    stmt = select(Publication).where(Publication.slug == slug).options(selectinload(Publication.references))
+    stmt = select(Publication).where(Publication.slug == slug).options(
+        selectinload(Publication.references), selectinload(Publication.author)
+    )
     result = await db.execute(stmt)
     pub = result.scalar_one_or_none()
     if not pub:
@@ -103,7 +107,9 @@ async def update_publication(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Publication).where(Publication.id == pub_id).options(selectinload(Publication.references))
+    stmt = select(Publication).where(Publication.id == pub_id).options(
+        selectinload(Publication.references), selectinload(Publication.author)
+    )
     result = await db.execute(stmt)
     pub = result.scalar_one_or_none()
     if not pub:

@@ -28,9 +28,19 @@ class PublicationReferenceOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AuthorOut(BaseModel):
+    id: uuid.UUID
+    username: str
+    name: str
+    avatar_url: str | None
+
+    model_config = {"from_attributes": True}
+
+
 class PublicationOut(BaseModel):
     id: uuid.UUID
     author_id: uuid.UUID
+    author: AuthorOut | None = None
     title: str
     slug: str
     body: str

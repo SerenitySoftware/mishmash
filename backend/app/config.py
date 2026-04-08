@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     app_name: str = "Mishmash"
     debug: bool = True
     secret_key: str = "dev-secret-change-in-production"
+    cors_origins: str = "http://localhost:3000"  # comma-separated for multiple
 
     # Runner
     runner_timeout_seconds: int = 300

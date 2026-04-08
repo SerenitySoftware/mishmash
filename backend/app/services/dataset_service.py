@@ -62,9 +62,18 @@ async def list_datasets(
     db: AsyncSession, query: str | None = None, tags: list[str] | None = None,
     owner_username: str | None = None, sort: str = "updated",
     page: int = 1, page_size: int = 20,
+    requesting_user_id: uuid.UUID | None = None,
 ) -> tuple[list[Dataset], int]:
     stmt = select(Dataset).options(selectinload(Dataset.owner))
     count_stmt = select(func.count()).select_from(Dataset)
+
+    # Privacy: only show public datasets, or the user's own private ones
+    if requesting_user_id:
+        privacy_filter = (Dataset.is_public == True) | (Dataset.owner_id == requesting_user_id)  # noqa: E712
+    else:
+        privacy_filter = Dataset.is_public == True  # noqa: E712
+    stmt = stmt.where(privacy_filter)
+    count_stmt = count_stmt.where(privacy_filter)
 
     if query:
         search_filter = Dataset.name.ilike(f"%{query}%") | Dataset.description.ilike(f"%{query}%")

@@ -4,6 +4,8 @@ from app.models.analysis import Analysis, AnalysisDataset, AnalysisRun
 from app.models.comment import Comment
 from app.models.publication import Publication, PublicationReference
 from app.models.star import Star
+from app.models.api_key import ApiKey
+from app.models.notification import Notification
 
 __all__ = [
     "User",
@@ -17,4 +19,6 @@ __all__ = [
     "Publication",
     "PublicationReference",
     "Star",
+    "ApiKey",
+    "Notification",
 ]

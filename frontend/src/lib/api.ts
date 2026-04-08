@@ -229,6 +229,7 @@ export interface Comment {
 export interface Publication {
   id: string;
   author_id: string;
+  author: Author | null;
   title: string;
   slug: string;
   body: string;

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import { useAuth } from "@/lib/auth";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const links = [
   { href: "/datasets", label: "Datasets" },
@@ -44,11 +45,18 @@ export function Navigation() {
             {!loading && (
               user ? (
                 <>
+                  <NotificationBell />
                   <Link
                     href={`/u/${user.username}`}
                     className="text-sm font-medium text-gray-700 hover:text-gray-900"
                   >
                     {user.name}
+                  </Link>
+                  <Link
+                    href="/settings"
+                    className="text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Settings
                   </Link>
                   <button
                     onClick={logout}
